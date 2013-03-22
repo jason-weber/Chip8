@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string>
 #include <SDL.h>
+#include <Windows.h>
 
 #define NUM_REGISTERS 16
 #define STACK_SIZE 16

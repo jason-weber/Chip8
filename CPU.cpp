@@ -193,6 +193,7 @@ void CPU::dumpRegisters(){
 * Calls method corresponding to opcode.
 **/
 void CPU::decodeAndExecute(){
+	cout << "Executing opcode: " << hex << opcode << endl;
 	switch(opcode & 0xF000){
 	case 0x0000:
 		switch(opcode & 0x00FF){
@@ -328,7 +329,7 @@ void CPU::decodeAndExecute(){
 		invalidOpcode();
 		break;
 	}
-	cout << "Executed opcode: " << hex << opcode << endl;
+	
 	/*dumpMemory();
 	cin.get();*/
 }
@@ -670,15 +671,18 @@ void CPU::opcode_FX07(){
 * Awaits key press, then stores key in V[X]
 **/
 void CPU::opcode_FX0A(){
-	char key;
-	cin >> hex >> key;
-	if(key >= 0x0 && key <= 0xF){
-		V[opcode & 0x0F000 >> 8] = key;
+	bool done = false;
+	for(int i = 0; i < 16; i++){
+		if(key[i] != 0){
+			V[(opcode & 0x0F00) >> 8] = i;
+			done = true;
+		}
 	}
-	else{
-		cout << "Invalid Key entered" << endl;
+	if(!done){
+		return;
 	}
 	pc += 2;
+	
 }
 
 /*
@@ -796,7 +800,7 @@ bool loadRom(CPU* chip8){
 	cin.get();
 	
 
-	cout << "Loading %s...\n" << filename << endl;
+	cout << "Loading..." << filename << endl;
 	FILE *pFile;
 	pFile = fopen(filename.c_str(), "rb");
 
@@ -844,29 +848,38 @@ bool loadRom(CPU* chip8){
 	free(buffer);
 }
 
+/*
+* Scales up gfx to window dimensions
+* TODO currently the bottleneck of my program
+**/
 void drawScreen(CPU* chip8, SDL_Surface* window){
+	Uint8 gfx = 0;
 	if(SDL_LockSurface(window) == 0){
-				for(int x = 0; x < 64; x++){
-					for(int y = 0; y < 32; y++){
+		//iterate Chip8->gfx 
+		SDL_FillRect(window, NULL, 0);
+		for(int y = 0; y < 32; y++){
+			for(int x = 0; x < 64; x++){
+				//Store byte of gfx
+				gfx = chip8->gfx[x + y * 64];
 
-						Uint8 gfx = chip8->gfx[x + y * 64];
-						for(int winX = 0; winX < 10; winX++){
-							for(int winY = 0; winY < 10; winY++){
-								for(int pix = 7; pix >= 0; pix--){
-									putpixel(window, x * 10 + winX, y * 10 + winY, (gfx >> pix)* 150);
-								}
-							}
+				//iterate window scale
+				if(gfx != 0){
+					for(int winX = 0; winX < 10; winX++){
+						for(int winY = 0; winY < 10; winY++){
+								putpixel(window, x * 10 + winX, y * 10 + winY, (gfx * 255));
 						}
 					}
 				}
 			}
-			else{
-				cout << "SURFACE COULD NOT BE LOCKED" << endl;
-				cin.get();
-			}
-			SDL_UnlockSurface(window);
-			SDL_UpdateRect(window, 0, 0, 0, 0);
-			chip8->drawFlag = false;
+		}
+	}
+	else{
+		cout << "SURFACE COULD NOT BE LOCKED" << endl;
+		cin.get();
+	}
+	SDL_UnlockSurface(window);
+	SDL_Flip(window);
+	chip8->drawFlag = false;
 }
 
 int main(int argc, char **argv){
@@ -875,10 +888,13 @@ int main(int argc, char **argv){
 	loadRom(chip8);
 
 	SDL_Init(SDL_INIT_EVERYTHING);
-	SDL_Surface* window = SDL_SetVideoMode(640, 320, 32, SDL_SWSURFACE);
-	
+	SDL_Surface* window = SDL_SetVideoMode(640, 320, 8, SDL_HWSURFACE | SDL_DOUBLEBUF);
+	string title = "Chip 8";
+	SDL_WM_SetCaption(title.c_str(), title.c_str());
 
+	ULONGLONG curtime;
 	for(;;){
+		curtime = GetTickCount64();
 		chip8->emulateCycle();	//Grabs opcode, decodes it, and executes it
 
 		//If draw flag is set, update screen
@@ -888,6 +904,8 @@ int main(int argc, char **argv){
 		
 		//Store key press state (press and release)
 		chip8->setKeys();
+		curtime = (GetTickCount64() - curtime);
+		
 	}
 
 	SDL_Quit();
