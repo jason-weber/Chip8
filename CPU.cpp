@@ -1,6 +1,7 @@
 #include "CPU.h"
 
 CPU::CPU(){
+	//Sets all values to 0 or equivalent
 	pc = 0x200; //In Chip-8, program counter starts at address 0x200
 	opcode = 0;
 	I = 0;
@@ -55,6 +56,8 @@ CPU::CPU(){
 	for(int i = 0; i < 80; i++){
 		memory[i] = fontset[i];
 	}
+
+	srand(time(NULL));
 }
 
 /*
@@ -64,8 +67,10 @@ CPU::CPU(){
 void CPU::setKeys(){
 	while(SDL_PollEvent(&event)){
 		switch(event.type){
+		//If quit event, program exits
 		case SDL_QUIT:
 			exit(0);
+		//Store key press in relevant spot in key array
 		case SDL_KEYDOWN:
 			switch(event.key.keysym.sym){
 			case SDLK_0:
@@ -120,6 +125,7 @@ void CPU::setKeys(){
 				break;
 			}
 			break;
+		//On key release, set relevant array spots to 0
 		case SDL_KEYUP:
 			switch(event.key.keysym.sym){
 			case SDLK_0:
@@ -180,6 +186,9 @@ void CPU::setKeys(){
 	}
 }
 
+/*
+* Print out the value of all registers
+**/
 void CPU::dumpRegisters(){
 	cout << "Registers: " << endl;
 	for(int i = 0; i < sizeof(V); i++){
@@ -194,6 +203,7 @@ void CPU::dumpRegisters(){
 **/
 void CPU::decodeAndExecute(){
 	cout << "Executing opcode: " << hex << opcode << endl;
+	//This bitwise and gets the first byte of the opcode
 	switch(opcode & 0xF000){
 	case 0x0000:
 		switch(opcode & 0x00FF){
@@ -329,9 +339,6 @@ void CPU::decodeAndExecute(){
 		invalidOpcode();
 		break;
 	}
-	
-	/*dumpMemory();
-	cin.get();*/
 }
 
 /*
@@ -368,9 +375,11 @@ void CPU::emulateCycle(){
 * if they are greater than 0. sound_timer prints "beep\n" when 1
 **/
 void CPU::checkTimers(){
+	//Decrement delay timer if necessary
 	if(delay_timer > 0){
 		--delay_timer;
 	}
+	//Decrement sound timer if necessary
 	if(sound_timer > 0){
 		if(sound_timer == 1){
 			cout << "Beep\n";
@@ -388,6 +397,9 @@ void CPU::invalidOpcode(){
 	cin.get();
 }
 
+/**
+* Ignored opcode
+*/ 
 void CPU::opcode_0NNN(){
 	
 }
@@ -396,10 +408,12 @@ void CPU::opcode_0NNN(){
 * Clears the screen. 
 **/
 void CPU::opcode_00E0(){
+	//Set all values in gfx to 0
 	for(int i = 0; i < 2048; i++){
 		gfx[i] = 0;
 	}
 	pc += 2;
+	//Set draw flag so screen is updated
 	drawFlag = true;
 }
 
@@ -407,7 +421,9 @@ void CPU::opcode_00E0(){
 * Returns from a subroutine
 **/
 void CPU::opcode_00EE(){
+	//Set program counter to topmost value on stack
 	pc = stack[sp];
+	//Decrement stack point to point to next value on stack
 	--sp;
 	pc += 2;
 }
@@ -603,7 +619,7 @@ void CPU::opcode_BNNN(){
 * Stores RANDOM byte AND NN into V[X]
 **/
 void CPU::opcode_CXNN(){
-	V[(opcode & 0x0F00) >> 8] = ((unsigned char)rand()) & (opcode & 0x00FF);
+	V[(opcode & 0x0F00) >> 8] = (rand() % 0xFF) & (opcode & 0x00FF);
 	pc += 2;
 }
 
@@ -614,19 +630,25 @@ void CPU::opcode_CXNN(){
 * V[F] set to 1 if any pixels flipped from set to unset, 0 if not
 **/
 void CPU::opcode_DXYN(){
+	//X location of sprite
 	unsigned short x = V[(opcode & 0x0F00) >> 8];
+	//Y location of sprite
 	unsigned short y = V[(opcode & 0x00F0) >> 4];
+	//Height of sprite
 	unsigned short height = opcode & 0x000F;
 	unsigned short pixel;
  
 	V[0xF] = 0;
 	for (int yline = 0; yline < height; yline++){
+		
 		pixel = memory[I + yline];
 		for(int xline = 0; xline < 8; xline++){
 			if((pixel & (0x80 >> xline)) != 0){
+				
 				if(gfx[(x + xline + ((y + yline) * 64))] == 1){
 					V[0xF] = 1;
 				}
+				//XOR gfx with 1, flipping the pixel on if it is off, or off if it is on
 				gfx[x + xline + ((y + yline) * 64)] ^= 1;
 			}
 		}
@@ -672,6 +694,7 @@ void CPU::opcode_FX07(){
 **/
 void CPU::opcode_FX0A(){
 	bool done = false;
+	//CPU loops until a key is pressed
 	for(int i = 0; i < 16; i++){
 		if(key[i] != 0){
 			V[(opcode & 0x0F00) >> 8] = i;
@@ -705,7 +728,7 @@ void CPU::opcode_FX18(){
 * Adds V[X] to I
 **/
 void CPU::opcode_FX1E(){
-	if(0xFFF - V[(opcode & 0x0F00) >> 8] < I){
+	if(V[(opcode & 0x0F00) >> 8]  + I < 0xFFF){
 		V[0xF] = 1;
 	}
 	else{
@@ -719,7 +742,7 @@ void CPU::opcode_FX1E(){
 * Sets I to the location of the sprite for character in V[X]
 **/
 void CPU::opcode_FX29(){
-	I = V[(opcode & 0x0F00) >> 8];
+	I = V[(opcode & 0x0F00) >> 8] * 0x5;
 	pc += 2;
 }
 
@@ -745,6 +768,7 @@ void CPU::opcode_FX55(){
 		memory[I + i] = V[i];
 	}
 	pc += 2;
+	I = I + ((opcode & 0x0F00) >> 8) + 1;
 }
 
 /*
@@ -756,119 +780,84 @@ void CPU::opcode_FX65(){
 		V[i] = memory[I + i];
 	}
 	pc += 2;
+	I = I + ((opcode & 0x0F00) >> 8) + 1;
 }
 
 /*
-* Allows pixel by pixel editing on SDL_SURFACE
+* Loads a rom from a given filename from the console.
 **/
-void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel){
-    int bpp = surface->format->BytesPerPixel;
-    /* Here p is the address to the pixel we want to set */
-    Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
-
-    switch(bpp) {
-    case 1:
-        *p = pixel;
-        break;
-
-    case 2:
-        *(Uint16 *)p = pixel;
-        break;
-
-    case 3:
-        if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
-            p[0] = (pixel >> 16) & 0xff;
-            p[1] = (pixel >> 8) & 0xff;
-            p[2] = pixel & 0xff;
-        } else {
-            p[0] = pixel & 0xff;
-            p[1] = (pixel >> 8) & 0xff;
-            p[2] = (pixel >> 16) & 0xff;
-        }
-        break;
-
-    case 4:
-        *(Uint32 *)p = pixel;
-        break;
-    }
-}
-
-bool loadRom(CPU* chip8){
+bool CPU::loadRom(){
 	string filename;
 	cout << "Enter the name of the program to load: ";
 	cin >> filename;
 	cin.get();
-	
 
 	cout << "Loading..." << filename << endl;
-	FILE *pFile;
-	pFile = fopen(filename.c_str(), "rb");
-
-	if(!pFile)
-	{
-		printf("Rom not found\n\n");
-		return false;
-	}
-
-	// Check file size
-	fseek(pFile, 0, SEEK_END);
-	long lSize = ftell(pFile);
-	rewind(pFile);
-
-	printf("Filesize: %d\n", (int)lSize);
-	// Allocate memory to contain the whole file
-	char *buffer = (char*)malloc(sizeof(char) * lSize);
-
-	if(!buffer)
-	{
-		printf("Error allocating rom data\n\n");
-		return false;
-	}
-
-	// Copy the file into the buffer
-	size_t result = fread(buffer, 1, lSize, pFile);
-
-	if(result != lSize)
-	{
-		printf("Error reading rom data\n\n");
-		return false;
-	}
-
-	// Copy buffer to Chip8 memory
-	if((4096 - 512) > lSize){
-		for(int i = 0; i < lSize; ++i)
-			chip8->memory[i + 512] = buffer[i];
+	
+	//Open binary file. The ate flag sets stream position to end of file.
+	//This makes tellg() return the file size
+	ifstream ifs(filename, ifstream::binary | ifstream::ate);
+	if(ifs.good()){
+		//Get size of file
+		long size = ifs.tellg();
+	
+		//Allocate buffer for file data
+		char *buff = (char*)malloc(sizeof(char) * size);
+		if(!buff){
+			printf("Error allocating rom data\n\n");
+			return false;
+		}	
+	
+		//Set stream position back to beginning
+		ifs.seekg(0);
+		int count = 0;
+		//Read file into buffer
+		ifs.read(buff, size);
+	
+		// Copy buffer to Chip8 memory
+		for(int i = 0; i < size; ++i){
+			memory[i + 512] = buff[i];
+		}
+	
+		// Free the buffer
+		free(buff);
 	}
 	else{
-		printf("Error: ROM too large for memory");
+		cout <<"Error: File not found." << endl;
+		ifs.close();
+		return false;
 	}
-
-	// Close file and free buffer
-	fclose(pFile);
-	free(buffer);
+	ifs.close();
+	return true;
 }
 
 /*
 * Scales up gfx to window dimensions
-* TODO currently the bottleneck of my program
 **/
-void drawScreen(CPU* chip8, SDL_Surface* window){
-	Uint8 gfx = 0;
+void drawScreen(unsigned char gfx[], SDL_Surface* window){
+	Uint8 gfxPixel = 0;
+	SDL_Rect pixel = {0, 0, 10, 10};
+	
+	//Must lock surface before it can be drawn on
 	if(SDL_LockSurface(window) == 0){
-		//iterate Chip8->gfx 
+
+		//Clear surface 
 		SDL_FillRect(window, NULL, 0);
+
+		//Iterate gfx array
 		for(int y = 0; y < 32; y++){
 			for(int x = 0; x < 64; x++){
+				
 				//Store byte of gfx
-				gfx = chip8->gfx[x + y * 64];
+				gfxPixel = gfx[x + y * 64];
 
-				//iterate window scale
-				if(gfx != 0){
-					for(int winX = 0; winX < 10; winX++){
-						for(int winY = 0; winY < 10; winY++){
-								putpixel(window, x * 10 + winX, y * 10 + winY, (gfx * 255));
-						}
-					}
+				//Only draw pixel if it is on, to save time
+				if(gfxPixel != 0){
+					//Set pixel location
+					pixel.x = x * 10;
+					pixel.y = y * 10;
+					//Draw pixel
+					SDL_FillRect(window, &pixel, 255);
 				}
 			}
 		}
@@ -878,37 +867,40 @@ void drawScreen(CPU* chip8, SDL_Surface* window){
 		cin.get();
 	}
 	SDL_UnlockSurface(window);
+	//Flip the buffers
 	SDL_Flip(window);
-	chip8->drawFlag = false;
 }
 
 int main(int argc, char **argv){
 	CPU* chip8 = new CPU(); // Our Chip-8 CPU
 	
-	loadRom(chip8);
+	//Load the rom into memory
+	if(chip8->loadRom()){
+	
+		SDL_Init(SDL_INIT_EVERYTHING);
+		SDL_Surface* window = SDL_SetVideoMode(640, 320, 8, SDL_HWSURFACE | SDL_DOUBLEBUF);
+		string title = "Chip 8";
+		SDL_WM_SetCaption(title.c_str(), title.c_str());
 
-	SDL_Init(SDL_INIT_EVERYTHING);
-	SDL_Surface* window = SDL_SetVideoMode(640, 320, 8, SDL_HWSURFACE | SDL_DOUBLEBUF);
-	string title = "Chip 8";
-	SDL_WM_SetCaption(title.c_str(), title.c_str());
+		ULONGLONG curtime;
+		for(;;){
+			curtime = GetTickCount64();
+			chip8->emulateCycle();	//Grabs opcode, decodes it, and executes it
 
-	ULONGLONG curtime;
-	for(;;){
-		curtime = GetTickCount64();
-		chip8->emulateCycle();	//Grabs opcode, decodes it, and executes it
-
-		//If draw flag is set, update screen
-		if(chip8->drawFlag){
-			drawScreen(chip8, window);
+			//If draw flag is set, update screen
+			if(chip8->drawFlag){
+				drawScreen(chip8->gfx, window);
+				chip8->drawFlag = false;
+			}
+		
+			//Store key press state (press and release)
+			chip8->setKeys();
+			curtime = (GetTickCount64() - curtime);
 		}
-		
-		//Store key press state (press and release)
-		chip8->setKeys();
-		curtime = (GetTickCount64() - curtime);
-		
-	}
 
-	SDL_Quit();
+		SDL_Quit();
+	}
+	return 0;
 }
 
 

@@ -78,8 +78,6 @@
     <None Include="..\..\..\..\Downloads\myChip8-bin-src\pong2.c8" />
     <None Include="..\..\..\..\Downloads\myChip8-bin-src\tetris.c8" />
     <None Include="DelayTimerTest.ch8" />
-    <None Include="font.ch8" />
-    <None Include="KeypadTest.ch8" />
     <None Include="picture.ch8" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

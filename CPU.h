@@ -5,6 +5,7 @@
 #include <string>
 #include <SDL.h>
 #include <Windows.h>
+#include <time.h>
 
 #define NUM_REGISTERS 16
 #define STACK_SIZE 16
@@ -14,6 +15,8 @@
 #define MEM_SIZE 4096
 
 using namespace std;
+
+
 
 class CPU{
 private:
@@ -36,25 +39,42 @@ private:
 	unsigned short sp;			//Stack pointer, points to memory location before jump
 	unsigned char key[NUM_KEYS];		//store current state of key on keypad
 	
+	//Prints an error if an unknown opcode is provided
 	void invalidOpcode();
+	//Checks the timers to decrement them
 	void checkTimers();
+	//Gathers the next opcode from memory
 	void fetchOpcode();
+	//Calls the appropriate method for the opcode
 	void decodeAndExecute();
 	
 public:
+	//Array of bytes for the 64x32 display. 
 	unsigned char gfx[GFX_WIDTH * GFX_HEIGHT]; //Draws a 64x32 screen. 2048 pixels. (0 for off, 1 for on)
+	//Constuctor
 	CPU();
+	//True if a value in gfx has changed, false otherwise
+	//If true, the display is redrawn
 	bool drawFlag;
+
+	//Array of bytes for memory
 	unsigned char memory[MEM_SIZE];	//4K of memory, each char == 1 byte
+	//event to detect key input
 	SDL_Event event; 
 
+	//Initialize CPU
 	void initialize();
+
+	bool loadRom();
+	//Emulate one cycle (one instruction)
 	void emulateCycle();
+	//Check for change in key state and change key array accordingly
 	void setKeys();
 
+	//Print out values of all registers
 	void dumpRegisters();
 	
-
+	//Separate method for each opcode
 	void opcode_0NNN();
 	void opcode_00E0();
 	void opcode_00EE();
